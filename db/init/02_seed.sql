@@ -95,14 +95,72 @@ SELECT '33333333-3333-3333-3333-333333333302', '22222222-2222-2222-2222-22222222
        CURRENT_DATE - 40, 90, b.id, 'active'
 FROM beds b WHERE b.monk_id='22222222-2222-2222-2222-222222222214';
 
-INSERT INTO inspections (monk_id, guadan_id, start_date, expected_end, result, note)
+INSERT INTO inspections (monk_id, guadan_id, start_date, expected_end, required_rounds, pass_score, result, note)
 VALUES
     ('22222222-2222-2222-2222-222222222213',
      '33333333-3333-3333-3333-333333333301',
-     CURRENT_DATE - 70, CURRENT_DATE + 22, 'pending', '随众用功，行持稳重'),
+     CURRENT_DATE - 70, CURRENT_DATE + 22, 3, 60, 'pending', '随众用功，行持稳重'),
     ('22222222-2222-2222-2222-222222222214',
      '33333333-3333-3333-3333-333333333302',
-     CURRENT_DATE - 40, CURRENT_DATE + 80, 'pending', NULL);
+     CURRENT_DATE - 40, CURRENT_DATE + 80, 4, 60, 'pending', NULL);
+
+-- ---------------------------------------------------------------------
+-- 月度评议演示数据
+-- 行简：第 1、2 轮已汇总（第 2 轮含僧值常济缺席补评），第 3 轮评议中
+-- 定空：第 1 轮已汇总（分数平平），第 2 轮评议中
+-- ---------------------------------------------------------------------
+INSERT INTO review_rounds (id, inspection_id, round_no, period_start, period_end, status,
+                           reviewer_count, avg_score, absent_count, summary_note, summarized_by, summarized_at)
+SELECT '44444444-4444-4444-4444-444444444401', i.id, 1, CURRENT_DATE - 70, CURRENT_DATE - 41, 'summarized',
+       4, 82.75, 0, '初来安住，作息如法，众中和合。', '慧海', CURRENT_DATE - 40
+FROM inspections i WHERE i.guadan_id = '33333333-3333-3333-3333-333333333301';
+INSERT INTO review_rounds (id, inspection_id, round_no, period_start, period_end, status,
+                           reviewer_count, avg_score, absent_count, summary_note, summarized_by, summarized_at)
+SELECT '44444444-4444-4444-4444-444444444402', i.id, 2, CURRENT_DATE - 40, CURRENT_DATE - 11, 'summarized',
+       4, 85.50, 0, '随众精进，可堪造就。', '慧海', CURRENT_DATE - 10
+FROM inspections i WHERE i.guadan_id = '33333333-3333-3333-3333-333333333301';
+INSERT INTO review_rounds (id, inspection_id, round_no, period_start, period_end, status)
+SELECT '44444444-4444-4444-4444-444444444403', i.id, 3, CURRENT_DATE - 10, CURRENT_DATE + 19, 'open'
+FROM inspections i WHERE i.guadan_id = '33333333-3333-3333-3333-333333333301';
+INSERT INTO review_rounds (id, inspection_id, round_no, period_start, period_end, status,
+                           reviewer_count, avg_score, absent_count, summary_note, summarized_by, summarized_at)
+SELECT '44444444-4444-4444-4444-444444444404', i.id, 1, CURRENT_DATE - 40, CURRENT_DATE - 11, 'summarized',
+       3, 60.00, 1, '行持尚须磨炼，继续观察。', '慧海', CURRENT_DATE - 10
+FROM inspections i WHERE i.guadan_id = '33333333-3333-3333-3333-333333333302';
+INSERT INTO review_rounds (id, inspection_id, round_no, period_start, period_end, status)
+SELECT '44444444-4444-4444-4444-444444444405', i.id, 2, CURRENT_DATE - 10, CURRENT_DATE + 19, 'open'
+FROM inspections i WHERE i.guadan_id = '33333333-3333-3333-3333-333333333302';
+
+-- 执事评分（行简第 1 轮）
+INSERT INTO review_scores (id, round_id, reviewer_name, reviewer_post, score, comment) VALUES
+    ('55555555-5555-5555-5555-555555555501', '44444444-4444-4444-4444-444444444401', '慧海', '知客', 85, '待人接物谦和，客堂规矩已熟。'),
+    ('55555555-5555-5555-5555-555555555502', '44444444-4444-4444-4444-444444444401', '妙音', '维那', 82, '唱念尚生，功课不缺。'),
+    ('55555555-5555-5555-5555-555555555503', '44444444-4444-4444-4444-444444444401', '庆云', '典座', 80, '斋堂行堂勤快。'),
+    ('55555555-5555-5555-5555-555555555504', '44444444-4444-4444-4444-444444444401', '常济', '僧值', 84, '守规矩，不违众。');
+-- 行简第 2 轮（常济当月缺席，事后补评）
+INSERT INTO review_scores (round_id, reviewer_name, reviewer_post, score, comment) VALUES
+    ('44444444-4444-4444-4444-444444444402', '慧海', '知客', 88, '渐能独当一面。'),
+    ('44444444-4444-4444-4444-444444444402', '妙音', '维那', 86, '唱念进步明显。'),
+    ('44444444-4444-4444-4444-444444444402', '庆云', '典座', 85, '行堂稳重，无怨言。');
+INSERT INTO review_scores (round_id, reviewer_name, reviewer_post, score, comment, is_makeup) VALUES
+    ('44444444-4444-4444-4444-444444444402', '常济', '僧值', 83, '上月外出办事未及评议，观其行持一向安稳。', true);
+-- 行简第 3 轮（评议中）
+INSERT INTO review_scores (round_id, reviewer_name, reviewer_post, score, comment) VALUES
+    ('44444444-4444-4444-4444-444444444403', '慧海', '知客', 87, '可予羯磨。'),
+    ('44444444-4444-4444-4444-444444444403', '妙音', '维那', 88, '功课纯熟。');
+-- 定空第 1 轮
+INSERT INTO review_scores (round_id, reviewer_name, reviewer_post, score, comment) VALUES
+    ('44444444-4444-4444-4444-444444444404', '慧海', '知客', 62, '性情稍急，待客尚须耐烦。'),
+    ('44444444-4444-4444-4444-444444444404', '妙音', '维那', 58, '唱念不熟，功课偶有迟到。'),
+    ('44444444-4444-4444-4444-444444444404', '庆云', '典座', 60, '行堂尚可，须督促。');
+-- 定空第 2 轮（评议中）
+INSERT INTO review_scores (round_id, reviewer_name, reviewer_post, score, comment) VALUES
+    ('44444444-4444-4444-4444-444444444405', '慧海', '知客', 65, '本月略有改进。');
+
+-- 评语修订留痕演示：慧海对行简第 1 轮评语作过一次修订
+INSERT INTO review_comment_revisions (score_id, old_score, new_score, old_comment, new_comment, revised_by)
+VALUES ('55555555-5555-5555-5555-555555555501', 80, 85,
+        '初来乍到，尚需观察。', '待人接物谦和，客堂规矩已熟。', '慧海');
 
 -- 已完成的历史挂单（舍单）
 INSERT INTO monks (id, dharma_name, home_monastery, ordination_no, status)

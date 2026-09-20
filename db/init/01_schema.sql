@@ -23,6 +23,9 @@ CREATE TYPE attendance_status AS ENUM ('present', 'absent', 'leave');
 
 CREATE TYPE alert_status AS ENUM ('open', 'acknowledged');
 
+CREATE TYPE review_round_status AS ENUM ('open', 'summarized');
+-- open 评议中（可评分） / summarized 已阶段汇总（此后评分记为缺席补评）
+
 -- ---------------------------------------------------------------------
 -- 僧人总表（挂单/考察/常住共用身份记录）
 -- ---------------------------------------------------------------------
@@ -85,7 +88,7 @@ CREATE INDEX idx_guadan_status ON guadan(status);
 CREATE INDEX idx_guadan_monk ON guadan(monk_id);
 
 -- ---------------------------------------------------------------------
--- 考察期（3-6 个月），通过后行羯磨转常住
+-- 考察期（3-6 个月），按月评议，通过后行羯磨转常住
 -- ---------------------------------------------------------------------
 CREATE TABLE inspections (
     id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -93,6 +96,10 @@ CREATE TABLE inspections (
     guadan_id       UUID NOT NULL REFERENCES guadan(id) ON DELETE CASCADE,
     start_date      DATE NOT NULL,
     expected_end    DATE NOT NULL,                         -- 预计考察期满
+    required_rounds INTEGER NOT NULL DEFAULT 3
+                    CHECK (required_rounds BETWEEN 3 AND 6), -- 规定评议次数（=考察月数）
+    pass_score      NUMERIC(5,2) NOT NULL DEFAULT 60
+                    CHECK (pass_score BETWEEN 0 AND 100),    -- 总平均分达标线
     result          inspection_result NOT NULL DEFAULT 'pending',
     karma_date      DATE,                                  -- 羯磨仪式日期（通过时）
     decided_at      TIMESTAMPTZ,                           -- 结论时间
@@ -102,6 +109,80 @@ CREATE TABLE inspections (
 -- 每位僧人同一时间只允许一条进行中的考察
 CREATE UNIQUE INDEX one_pending_inspection_per_monk
     ON inspections(monk_id) WHERE result = 'pending';
+
+-- ---------------------------------------------------------------------
+-- 月度评议轮次：考察期内每月一轮，多位执事独立评分后作阶段汇总
+-- ---------------------------------------------------------------------
+CREATE TABLE review_rounds (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    inspection_id   UUID NOT NULL REFERENCES inspections(id) ON DELETE CASCADE,
+    round_no        INTEGER NOT NULL CHECK (round_no > 0), -- 第几轮评议
+    period_start    DATE NOT NULL,                         -- 评议月起
+    period_end      DATE NOT NULL,                         -- 评议月止
+    status          review_round_status NOT NULL DEFAULT 'open',
+    -- 阶段汇总结果（汇总时写入；补评/修订后自动重算）
+    reviewer_count  INTEGER,                               -- 参与评分执事数
+    avg_score       NUMERIC(5,2),                          -- 本轮平均分
+    absent_count    INTEGER,                               -- 评议月内早晚课缺勤次数
+    summary_note    TEXT,                                  -- 阶段汇总结语
+    summarized_by   VARCHAR(64),                           -- 汇总人
+    summarized_at   TIMESTAMPTZ,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (inspection_id, round_no),
+    CHECK (period_end >= period_start)
+);
+CREATE INDEX idx_review_rounds_inspection ON review_rounds(inspection_id);
+
+-- ---------------------------------------------------------------------
+-- 执事评分：每位执事每轮一条，独立评分；汇总后提交记为缺席补评
+-- ---------------------------------------------------------------------
+CREATE TABLE review_scores (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    round_id        UUID NOT NULL REFERENCES review_rounds(id) ON DELETE CASCADE,
+    reviewer_name   VARCHAR(64) NOT NULL,                  -- 评分执事
+    reviewer_post   VARCHAR(64),                           -- 执事职务（知客/维那/典座等）
+    score           INTEGER NOT NULL CHECK (score BETWEEN 0 AND 100),
+    comment         TEXT,                                  -- 评语
+    is_makeup       BOOLEAN NOT NULL DEFAULT false,        -- 是否缺席补评
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (round_id, reviewer_name)
+);
+CREATE INDEX idx_review_scores_round ON review_scores(round_id);
+
+-- ---------------------------------------------------------------------
+-- 评语/分数修订历史：每次修订留痕
+-- ---------------------------------------------------------------------
+CREATE TABLE review_comment_revisions (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    score_id        UUID NOT NULL REFERENCES review_scores(id) ON DELETE CASCADE,
+    old_score       INTEGER,
+    new_score       INTEGER,
+    old_comment     TEXT,
+    new_comment     TEXT,
+    revised_by      VARCHAR(64),                           -- 修订人
+    revised_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_review_revisions_score ON review_comment_revisions(score_id);
+
+-- ---------------------------------------------------------------------
+-- 羯磨决策快照：通过/不通过时冻结完整评议过程与门槛校验结果
+-- ---------------------------------------------------------------------
+CREATE TABLE inspection_decisions (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    inspection_id   UUID NOT NULL REFERENCES inspections(id) ON DELETE CASCADE,
+    decision        inspection_result NOT NULL,            -- passed / failed
+    required_rounds INTEGER NOT NULL,                      -- 规定评议次数
+    completed_rounds INTEGER NOT NULL,                     -- 已汇总评议次数
+    overall_avg     NUMERIC(5,2),                          -- 总平均分
+    pass_score      NUMERIC(5,2) NOT NULL,                 -- 达标线
+    open_alerts     INTEGER NOT NULL,                      -- 决策时未处理缺勤提醒数
+    gate_passed     BOOLEAN NOT NULL,                      -- 门槛是否全部满足
+    snapshot        JSONB NOT NULL,                        -- 完整快照（轮次/评分/修订/考勤/门槛）
+    decided_by      VARCHAR(64),                           -- 经办人
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_inspection_decisions_inspection ON inspection_decisions(inspection_id);
 
 -- ---------------------------------------------------------------------
 -- 早晚课考勤（按人 / 日期 / 课次唯一）
@@ -151,6 +232,8 @@ CREATE TRIGGER trg_monks_updated   BEFORE UPDATE ON monks
 CREATE TRIGGER trg_guadan_updated  BEFORE UPDATE ON guadan
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER trg_attendance_updated BEFORE UPDATE ON attendance
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER trg_review_scores_updated BEFORE UPDATE ON review_scores
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- ---------------------------------------------------------------------

@@ -74,7 +74,8 @@
               <n-thing :title="i.dharma_name">
                 <template #description>
                   自 {{ i.start_date }} 起，已考察 {{ i.days_elapsed }} 天，
-                  剩 <n-text strong>{{ Math.max(i.days_left ?? 0, 0) }}</n-text> 天期满
+                  剩 <n-text strong>{{ Math.max(i.days_left ?? 0, 0) }}</n-text> 天期满 ·
+                  评议 {{ i.completed_rounds ?? 0 }}/{{ i.required_rounds }} 轮
                 </template>
                 <n-progress
                   type="line"

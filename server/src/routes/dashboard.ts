@@ -45,9 +45,11 @@ const routes: FastifyPluginAsync = async (app) => {
     `);
 
     const pendingInspections = await many(`
-      SELECT i.id, m.dharma_name, i.start_date, i.expected_end,
+      SELECT i.id, m.dharma_name, i.start_date, i.expected_end, i.required_rounds,
              (CURRENT_DATE - i.start_date)::int AS days_elapsed,
-             (i.expected_end - CURRENT_DATE)::int AS days_left
+             (i.expected_end - CURRENT_DATE)::int AS days_left,
+             (SELECT count(*)::int FROM review_rounds r
+               WHERE r.inspection_id = i.id AND r.status = 'summarized') AS completed_rounds
       FROM inspections i JOIN monks m ON m.id=i.monk_id
       WHERE i.result='pending'
       ORDER BY i.expected_end

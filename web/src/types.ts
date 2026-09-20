@@ -73,6 +73,8 @@ export interface Inspection {
   guadan_id: string;
   start_date: string;
   expected_end: string;
+  required_rounds: number;
+  pass_score: number;
   result: InspectionResult;
   karma_date: string | null;
   decided_at: string | null;
@@ -81,6 +83,91 @@ export interface Inspection {
   ordination_no: string | null;
   days_elapsed: number;
   days_left?: number;
+  completed_rounds?: number;
+  overall_avg?: number | null;
+}
+
+export type ReviewRoundStatus = 'open' | 'summarized';
+
+export interface ReviewScore {
+  id: string;
+  round_id: string;
+  reviewer_name: string;
+  reviewer_post: string | null;
+  score: number;
+  comment: string | null;
+  is_makeup: boolean;
+  created_at: string;
+  updated_at: string;
+  revision_count?: number;
+}
+
+export interface ReviewRound {
+  id: string;
+  inspection_id: string;
+  round_no: number;
+  period_start: string;
+  period_end: string;
+  status: ReviewRoundStatus;
+  reviewer_count: number | null;
+  avg_score: number | null;
+  absent_count: number | null;
+  summary_note: string | null;
+  summarized_by: string | null;
+  summarized_at: string | null;
+  created_at: string;
+  score_count?: number;
+  scores?: ReviewScore[];
+}
+
+export interface ReviewRevision {
+  id: string;
+  score_id: string;
+  old_score: number | null;
+  new_score: number | null;
+  old_comment: string | null;
+  new_comment: string | null;
+  revised_by: string | null;
+  revised_at: string;
+}
+
+export interface GateCheck {
+  required_rounds: number;
+  completed_rounds: number;
+  rounds_ok: boolean;
+  open_alerts: number;
+  alerts_ok: boolean;
+  overall_avg: number | null;
+  pass_score: number;
+  score_ok: boolean;
+  gate_passed: boolean;
+  reasons: string[];
+}
+
+export interface ReviewOverview {
+  inspection: Inspection;
+  rounds: ReviewRound[];
+  gate: GateCheck;
+}
+
+export interface InspectionDecision {
+  id: string;
+  inspection_id: string;
+  decision: 'passed' | 'failed';
+  required_rounds: number;
+  completed_rounds: number;
+  overall_avg: number | null;
+  pass_score: number;
+  open_alerts: number;
+  gate_passed: boolean;
+  snapshot: {
+    inspection: Record<string, unknown>;
+    gate: GateCheck;
+    rounds: (ReviewRound & { scores: (ReviewScore & { revisions: ReviewRevision[] })[] })[];
+    attendance: { present: number; absent: number; leave: number };
+  };
+  decided_by: string | null;
+  created_at: string;
 }
 
 export interface AttendanceRow {
