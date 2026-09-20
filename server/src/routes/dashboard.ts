@@ -46,8 +46,20 @@ const routes: FastifyPluginAsync = async (app) => {
 
     const pendingInspections = await many(`
       SELECT i.id, m.dharma_name, i.start_date, i.expected_end,
+             i.required_reviews, i.pass_score,
              (CURRENT_DATE - i.start_date)::int AS days_elapsed,
-             (i.expected_end - CURRENT_DATE)::int AS days_left
+             (i.expected_end - CURRENT_DATE)::int AS days_left,
+             (SELECT count(*) FROM review_rounds
+               WHERE inspection_id=i.id AND status='summarized')::int AS completed_rounds,
+             (SELECT round(avg(average_score), 2) FROM review_rounds
+               WHERE inspection_id=i.id AND status='summarized') AS overall_avg,
+             (SELECT count(*)
+                FROM review_reviewers rv
+                JOIN review_rounds rr ON rr.id=rv.round_id
+                LEFT JOIN review_scores s ON s.round_id=rv.round_id AND s.reviewer_id=rv.reviewer_id
+               WHERE rr.inspection_id=i.id AND s.id IS NULL)::int AS makeup_pending,
+             (SELECT count(*) FROM absence_alerts
+               WHERE monk_id=i.monk_id AND status='open')::int AS open_alert_count
       FROM inspections i JOIN monks m ON m.id=i.monk_id
       WHERE i.result='pending'
       ORDER BY i.expected_end

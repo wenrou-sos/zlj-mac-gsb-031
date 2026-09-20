@@ -5,6 +5,11 @@ const { Pool, types } = pg;
 // DATE 列按字符串返回（YYYY-MM-DD），避免被转成带时区的 Date 对象
 types.setTypeParser(types.builtins.DATE, (value: string | null) => value);
 
+// NUMERIC 列直接解析为 number（评分/均分均在安全范围内）
+types.setTypeParser(types.builtins.NUMERIC, (value: string | null) =>
+  value === null ? null : Number(value),
+);
+
 export const pool = new Pool({
   host: process.env.PGHOST ?? 'localhost',
   port: Number(process.env.PGPORT ?? 5432),
@@ -47,3 +52,6 @@ export const MONK_STATUSES = ['guadan', 'inspection', 'permanent', 'left'] as co
 export const GUADAN_STATUSES = ['active', 'closed'] as const;
 export const INSPECTION_RESULTS = ['pending', 'passed', 'failed'] as const;
 export const ALERT_STATUSES = ['open', 'acknowledged'] as const;
+export const ROUND_STATUSES = ['collecting', 'summarized'] as const;
+export const SUBMISSION_TYPES = ['normal', 'makeup'] as const;
+export const REVIEW_CONCLUSIONS = ['excellent', 'qualified', 'unqualified'] as const;

@@ -75,6 +75,22 @@
                 <template #description>
                   自 {{ i.start_date }} 起，已考察 {{ i.days_elapsed }} 天，
                   剩 <n-text strong>{{ Math.max(i.days_left ?? 0, 0) }}</n-text> 天期满
+                  <n-space :size="4" style="margin-top:4px">
+                    <n-tag size="small" :bordered="false"
+                           :type="(i.completed_rounds ?? 0) >= (i.required_reviews ?? 0) ? 'success' : 'warning'">
+                      月度评议 {{ i.completed_rounds ?? 0 }}/{{ i.required_reviews }}
+                    </n-tag>
+                    <n-tag v-if="(i.makeup_pending ?? 0) > 0" size="small" type="error" :bordered="false">
+                      缺席待补 {{ i.makeup_pending }}
+                    </n-tag>
+                    <n-tag v-if="(i.open_alert_count ?? 0) > 0" size="small" type="error" :bordered="false">
+                      缺勤待办 {{ i.open_alert_count }}
+                    </n-tag>
+                    <n-tag v-if="i.overall_avg !== null && i.overall_avg !== undefined" size="small"
+                           :type="Number(i.overall_avg) >= i.pass_score ? 'success' : 'error'" :bordered="false">
+                      均分 {{ i.overall_avg }}
+                    </n-tag>
+                  </n-space>
                 </template>
                 <n-progress
                   type="line"
@@ -119,7 +135,7 @@ import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import {
   NSpin, NGrid, NGridItem, NCard, NStatistic, NProgress, NList, NListItem, NThing,
-  NTag, NEmpty, NButton, NDescriptions, NDescriptionsItem, NText,
+  NSpace, NTag, NEmpty, NButton, NDescriptions, NDescriptionsItem, NText,
 } from 'naive-ui';
 import { http } from '../api.js';
 import type { Dashboard, Inspection, MonkStatus } from '../types.js';

@@ -47,3 +47,25 @@ export const SESSION_LABEL: Record<string, string> = {
   morning: '早课',
   evening: '晚课',
 };
+
+export const ROUND_STATUS_LABEL: Record<string, string> = {
+  collecting: '收评分中',
+  summarized: '已阶段汇总',
+};
+
+export const SUBMISSION_LABEL: Record<string, string> = {
+  normal: '按期评议',
+  makeup: '缺席补评',
+};
+
+export const CONCLUSION_LABEL: Record<string, string> = {
+  excellent: '优秀',
+  qualified: '合格',
+  unqualified: '不合格',
+};
+
+export const CONCLUSION_TYPE: Record<string, 'success' | 'warning' | 'error'> = {
+  excellent: 'success',
+  qualified: 'warning',
+  unqualified: 'error',
+};
